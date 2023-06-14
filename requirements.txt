@@ -1,0 +1,6 @@
+insightface
+pyfacer
+ultralytics
+opencv-python
+onnxruntime
+timm
