@@ -98,7 +98,7 @@ def main(args):
         sf_path = os.path.join(args.input_dir, sf)
         sf_name = Path(sf).stem
 
-        out_name = sf_name + "_mask.png"
+        out_name = sf_name + ".png"
         out_path = os.path.join(args.output_dir, out_name)
 
         if not args.overwrite and os.path.exists(out_path):
@@ -182,7 +182,7 @@ if __name__ == '__main__':
     parser.add_argument('--input-dir', type=str, help='Path to folder with input images')
     parser.add_argument('--output-dir', type=str, help='Path to output folder, it will be created if missing')
     parser.add_argument('--overwrite', action='store_true', help='Overwrite mask if file already exists in output folder')
-    parser.add_argument('--target-ref', type=str, help='Path to an image of a face for recognizing correct subject when multiple candidates exist in the same image.')
+    parser.add_argument('--target-ref', type=str, help='Optional. Path to an image of a face for recognizing correct subject when multiple candidates exist in the same image.')
     parser.add_argument('--face-weight', type=float, default=1.0, help='Weight to use for face pixels, must be a value between 0 and 1')
     parser.add_argument('--hair-weight', type=float, default=0.5, help='Weight to use for hair pixels, must be a value between 0 and 1')
     parser.add_argument('--body-weight', type=float, default=0.15, help='Weight to use for body pixels, must be a value between 0 and 1')
