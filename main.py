@@ -58,6 +58,10 @@ def dilate_mask(mask, amount, blur_radius):
     return result
 
 
+def mask_blend(src1, src2, mask):
+    return src1 * mask + src2 * (1.0 - mask)
+
+
 def find_nearest_face(faces, x, y):
     best_result = None
     best_dist = 0
@@ -139,10 +143,12 @@ def main(args):
             face_mask = full_mask.copy()
             face_mask[face_mask == seg_labels.index('hair')] = 0
             face_mask[face_mask > 0] = 1
+            face_mask = face_mask.astype(np.float32)
 
             hair_mask = full_mask.copy()
             hair_mask[hair_mask != seg_labels.index('hair')] = 0
             hair_mask[hair_mask > 0] = 1
+            hair_mask = hair_mask.astype(np.float32)
 
             result = body_seg(sf_path, device=args.device, classes=[0], retina_masks=True)
 
@@ -152,23 +158,19 @@ def main(args):
 
             # match face to body by finding body mask that overlaps the most with face mask
             best_score = 0
-            best_body_mask = None
+            body_mask = None
             for r in result[0].masks.data:
-                body_mask = r.numpy()
-                score = np.sum(face_mask * body_mask)
-                if best_body_mask is None or score > best_score:
+                m = r.numpy()
+                score = np.sum(face_mask * m)
+                if body_mask is None or score > best_score:
                     best_score = score
-                    best_body_mask = body_mask
+                    body_mask = m
 
             # put everything together
-            composed = np.amax(
-                [
-                    dilate_mask(face_mask * args.face_weight, 9, 7),
-                    dilate_mask(hair_mask * args.hair_weight, 15, 13),
-                    dilate_mask(best_body_mask * args.body_weight, 5, 3),
-                    np.full(face_mask.shape, args.min_weight)
-                ],
-                axis=0)
+            composed = np.full(body_mask.shape, args.bg_weight)
+            composed = mask_blend(np.full(composed.shape, args.body_weight), composed, dilate_mask(body_mask, 5, 3))
+            composed = mask_blend(np.full(composed.shape, args.hair_weight), composed, dilate_mask(hair_mask, 15, 13))
+            composed = mask_blend(np.full(composed.shape, args.face_weight), composed, dilate_mask(face_mask, 9, 7))
 
             if not os.path.exists(args.output_dir):
                 os.makedirs(args.output_dir)
@@ -177,15 +179,15 @@ def main(args):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Subject Masker')
+    parser = argparse.ArgumentParser(description='Person Mask Generator')
     parser.add_argument('--device', type=str, default='cpu', help='Name of torch device for inference')
     parser.add_argument('--input-dir', type=str, help='Path to folder with input images')
     parser.add_argument('--output-dir', type=str, help='Path to output folder, it will be created if missing')
     parser.add_argument('--overwrite', action='store_true', help='Overwrite mask if file already exists in output folder')
     parser.add_argument('--target-ref', type=str, help='Optional. Path to an image of a face for recognizing correct subject when multiple candidates exist in the same image.')
     parser.add_argument('--face-weight', type=float, default=1.0, help='Weight to use for face pixels, must be a value between 0 and 1')
-    parser.add_argument('--hair-weight', type=float, default=0.5, help='Weight to use for hair pixels, must be a value between 0 and 1')
-    parser.add_argument('--body-weight', type=float, default=0.15, help='Weight to use for body pixels, must be a value between 0 and 1')
-    parser.add_argument('--min-weight', type=float, default=0.0, help='Weight to use as a mask minimum, must be a value between 0 and 1')
+    parser.add_argument('--hair-weight', type=float, default=0.6, help='Weight to use for hair pixels, must be a value between 0 and 1')
+    parser.add_argument('--body-weight', type=float, default=0.25, help='Weight to use for body pixels, must be a value between 0 and 1')
+    parser.add_argument('--bg-weight', type=float, default=0.0, help='Weight to use for non-subject pixels, must be a value between 0 and 1')
     args = parser.parse_args()
     main(args)
